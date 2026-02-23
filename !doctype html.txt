@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>釣りスクラッチ対戦カウンター（全部入り）</title>
+  <style>
+    :root { --gap: 12px; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; margin: 0; background: #f6f7f9; color:#111; }
+    header { padding: 16px; background:#111; color:#fff; }
+    header h1 { font-size: 18px; margin: 0; }
+    main { padding: 16px; max-width: 1120px; margin: 0 auto; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: var(--gap); }
+    @media (min-width: 980px){ .grid { grid-template-columns: 1.25fr 0.75fr; } }
+    .card { background:#fff; border-radius: 16px; padding: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+    .row { display:flex; gap: var(--gap); flex-wrap: wrap; align-items: end; }
+    label { font-size: 12px; color:#444; display:block; margin-bottom:6px; }
+    input, select, button, textarea { font: inherit; }
+    input[type="number"], input[type="text"], select, textarea {
+      width: 100%; padding: 12px; border: 1px solid #d7dbe2; border-radius: 12px; background:#fff;
+    }
+    textarea { min-height: 130px; }
+    .field { flex: 1 1 160px; }
+    .btn { padding: 12px 14px; border: 0; border-radius: 12px; cursor: pointer; background:#111; color:#fff; }
+    .btn:active { transform: translateY(1px); }
+    .btn.sub { background:#4b5563; }
+    .btn.danger { background:#b91c1c; }
+    .btn.good { background:#047857; }
+    .btn.warn { background:#a16207; }
+    .pill { display:inline-flex; gap:8px; align-items:center; padding: 10px 12px; border-radius: 999px; background:#f0f2f6; }
+    .pill input { width:auto; }
+    .muted { color:#6b7280; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .stat { display:grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .stat div { background:#f6f7f9; border-radius: 12px; padding: 10px; }
+    .stat .big { font-size: 20px; font-weight: 800; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding: 10px 8px; border-bottom: 1px solid #eef1f5; font-size: 14px; vertical-align: top; }
+    th { color:#555; font-weight: 700; }
+    .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#f0f2f6; font-size: 12px; }
+    dialog { border: none; border-radius: 16px; width: min(520px, 92vw); box-shadow: 0 18px 50px rgba(0,0,0,.25); }
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+    .dlg-title { font-weight: 800; margin: 0 0 8px 0; }
+    .dlg-body { padding: 16px; }
+    .dlg-actions { display:flex; gap: 10px; justify-content: flex-end; padding: 0 16px 16px; }
+    .right { text-align: right; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>釣りスクラッチ対戦カウンター（全部入り）</h1>
+</header>
+
+<main>
+  <div class="grid">
+
+    <!-- Input -->
+    <section class="card">
+      <h2 style="margin:0 0 10px 0; font-size:16px;">記録する</h2>
+
+      <div class="row">
+        <div class="field">
+          <label>誰が釣った？</label>
+          <select id="who"></select>
+        </div>
+
+        <div class="field">
+          <label>サイズ（cm）</label>
+          <input id="cm" type="number" inputmode="decimal" min="0" step="0.1" placeholder="例：28.5" />
+        </div>
+
+        <div class="field">
+          <label>魚種（倍率）</label>
+          <select id="species"></select>
+        </div>
+
+        <div class="field" style="flex: 2 1 240px;">
+          <label>メモ（任意）</label>
+          <input id="memo" type="text" placeholder="例：表層・追い風・ブルピン など" />
+        </div>
+
+        <div class="field" style="flex: 0 0 160px;">
+          <button class="btn" id="addBtn">追加</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px;" class="row">
+        <span class="pill"><input id="bonusFirst" type="checkbox" /> <label for="bonusFirst" style="margin:0;">先制ボーナス（最初の1匹 +1枚）</label></span>
+        <span class="pill"><input id="bonusGirl" type="checkbox" /> <label for="bonusGirl" style="margin:0;">女性ボーナス（女性プレイヤー +1枚）</label></span>
+        <span class="pill"><input id="bonusFunny" type="checkbox" /> <label for="bonusFunny" style="margin:0;">外道ボーナス有効（“笑えたら+1”）</label></span>
+      </div>
+
+      <div style="margin-top: 12px;" class="row">
+        <button class="btn warn" id="funnyBtn" title="サイズ入力なしでも追加できる">🤣 笑えた外道 +1</button>
+        <button class="btn sub" id="manualBtn" title="任意の枚数を直接加算">➕ 手動で枚数を加算</button>
+      </div>
+
+      <p class="muted" style="margin: 10px 0 0;">
+        ※データは端末に保存（このブラウザ内）。「ホーム画面に追加」でアプリっぽく使えます。
+      </p>
+    </section>
+
+    <!-- Scoreboard -->
+    <aside class="card">
+      <h2 style="margin:0 0 10px 0; font-size:16px;">現在の合計</h2>
+      <div class="stat" id="scoreGrid"></div>
+
+      <div style="margin-top:12px;" class="row">
+        <button class="btn sub" id="undoBtn">取り消し</button>
+        <button class="btn danger" id="clearBtn">全消し</button>
+      </div>
+
+      <hr style="border:0; border-top:1px solid #eef1f5; margin:14px 0;">
+
+      <h3 style="margin:0 0 8px 0; font-size:14px;">当たりが出たら…（ご飯ルーレット）</h3>
+      <div class="row">
+        <button class="btn good" id="rouletteBtn">🍚 回す</button>
+        <button class="btn sub" id="editRouletteBtn">編集</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0;">スクラッチ当たりが出たら押してね。もちろん外れても押していい（人生は自由）。</p>
+    </aside>
+
+    <!-- Log -->
+    <section class="card" style="grid-column: 1 / -1;">
+      <h2 style="margin:0 0 10px 0; font-size:16px;">履歴</h2>
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>時刻</th>
+              <th>誰</th>
+              <th>サイズ</th>
+              <th>魚種</th>
+              <th>メモ</th>
+              <th>枚数</th>
+              <th class="muted">内訳</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="log"></tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin: 8px 0 0;">※「✏️」でその1件だけ編集できます。</p>
+    </section>
+
+    <!-- Settings -->
+    <section class="card" style="grid-column: 1 / -1;">
+      <h2 style="margin:0 0 10px 0; font-size:16px;">設定（全部ここでいじれる）</h2>
+
+      <div class="row">
+        <div class="field">
+          <label>プレイヤー（1行=名前,性別） 例：松島,m / 早妃子,f</label>
+          <textarea id="players"></textarea>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn" id="savePlayersBtn">プレイヤー保存</button>
+            <button class="btn sub" id="resetPlayersBtn">初期に戻す</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>サイズ→枚数（1行=cm,枚数）</label>
+          <textarea id="rules"></textarea>
+          <p class="muted" style="margin:8px 0 0;">
+            サイズ以上でその枚数（大きい条件が優先）。例：<span class="mono">30,3</span>
+          </p>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn" id="saveRulesBtn">ルール保存</button>
+            <button class="btn sub" id="resetRulesBtn">初期に戻す</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>魚種倍率（1行=表示名,倍率） 例：青物,1.2</label>
+          <textarea id="speciesRules"></textarea>
+          <p class="muted" style="margin:8px 0 0;">
+            基本枚数×倍率を四捨五入。例：3枚×1.2=4枚（気持ちが大事）
+          </p>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn" id="saveSpeciesBtn">倍率保存</button>
+            <button class="btn sub" id="resetSpeciesBtn">初期に戻す</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- Dialogs -->
+<dialog id="dlg">
+  <div class="dlg-body">
+    <h3 class="dlg-title" id="dlgTitle">Dialog</h3>
+    <div id="dlgContent"></div>
+  </div>
+  <div class="dlg-actions" id="dlgActions"></div>
+</dialog>
+
+<script>
+  const STORAGE_KEY = "scratchFishing_allin_v2";
+
+  // ---- Defaults ----
+  const defaultPlayers = [
+    { name: "松島", gender: "m" },
+    { name: "早妃子", gender: "f" },
+  ];
+
+  const defaultRules = [
+    { cm: 20, tickets: 1 },
+    { cm: 25, tickets: 2 },
+    { cm: 30, tickets: 3 },
+    { cm: 35, tickets: 5 },
+    { cm: 40, tickets: 7 },
+  ];
+
+  const defaultSpecies = [
+    { name: "指定なし", mult: 1.0 },
+    { name: "アジ・メバル系", mult: 1.0 },
+    { name: "フラット（ヒラメ/マゴチ）", mult: 1.15 },
+    { name: "青物（ヤズ/サゴシ等）", mult: 1.20 },
+    { name: "真鯛・根魚", mult: 1.10 },
+    { name: "外道（フグ/エソ等）", mult: 0.80 },
+  ];
+
+  const defaultRoulette = [
+    "焼肉",
+    "寿司",
+    "ラーメン（替え玉は正義）",
+    "うどん（福岡の誇り）",
+    "海鮮丼",
+    "餃子＋ビール（大人の勝利）",
+    "コンビニで好きなだけ（祭り）",
+    "家で鍋（優勝）",
+    "唐揚げ定食",
+    "カレー（なぜか毎回うまい）",
+  ];
+
+  // ---- State ----
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) throw new Error("no state");
+      const s = JSON.parse(raw);
+      // guards
+      if (!Array.isArray(s.players) || !Array.isArray(s.rules) || !Array.isArray(s.species) || !Array.isArray(s.log)) {
+        throw new Error("bad state");
+      }
+      return s;
+    } catch {
+      return {
+        players: defaultPlayers,
+        rules: defaultRules,
+        species: defaultSpecies,
+        roulette: defaultRoulette,
+        log: [],
+        bonusFirst: true,
+        bonusGirl: true,
+        bonusFunny: true,
+      };
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  let state = loadState();
+
+  // ---- Helpers ----
+  function nowText() {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,"0");
+    const mm = String(d.getMinutes()).padStart(2,"0");
+    return `${hh}:${mm}`;
+  }
+
+  function escapeHtml(s) {
+    return (s ?? "").toString().replace(/[&<>"']/g, (c) => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  function rulesToText(rules) {
+    return rules.slice().sort((a,b)=>a.cm-b.cm).map(r => `${r.cm},${r.tickets}`).join("\n");
+  }
+  function parseRules(text) {
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    for (const line of lines) {
+      const [a,b] = line.split(",").map(x=>x.trim());
+      const cm = Number(a), tickets = Number(b);
+      if (Number.isFinite(cm) && Number.isFinite(tickets)) out.push({ cm, tickets });
+    }
+    out.sort((a,b)=>a.cm-b.cm);
+    return out.length ? out : defaultRules;
+  }
+
+  function playersToText(players) {
+    return players.map(p => `${p.name},${p.gender}`).join("\n");
+  }
+  function parsePlayers(text) {
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    for (const line of lines) {
+      const [name, genderRaw] = line.split(",").map(x=>x.trim());
+      const gender = (genderRaw || "m").toLowerCase();
+      if (!name) continue;
+      out.push({ name, gender: (gender === "f" ? "f" : "m") });
+    }
+    return out.length ? out : defaultPlayers;
+  }
+
+  function speciesToText(list) {
+    return list.map(s => `${s.name},${s.mult}`).join("\n");
+  }
+  function parseSpecies(text) {
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    for (const line of lines) {
+      const [name, multRaw] = line.split(",").map(x=>x.trim());
+      const mult = Number(multRaw);
+      if (!name || !Number.isFinite(mult)) continue;
+      out.push({ name, mult });
+    }
+    return out.length ? out : defaultSpecies;
+  }
+
+  function getPlayer(name) {
+    return state.players.find(p => p.name === name) || state.players[0];
+  }
+
+  function baseTicketsBySize(cm) {
+    const rules = state.rules.slice().sort((a,b)=>a.cm-b.cm);
+    let base = 0;
+    for (const r of rules) if (cm >= r.cm) base = r.tickets;
+    return base;
+  }
+
+  function calcTickets({cm, whoName, speciesName, isFirstCatch, funnyBonus=false, manualTickets=null}) {
+    const parts = [];
+    if (manualTickets != null) {
+      parts.push(`手動:${manualTickets}`);
+      return { total: manualTickets, breakdown: parts.join(" / ") };
+    }
+
+    const base = (cm != null) ? baseTicketsBySize(cm) : 0;
+    parts.push(`基準:${base}`);
+
+    const sp = state.species.find(s => s.name === speciesName) || state.species[0];
+    const mult = sp?.mult ?? 1.0;
+
+    // size-based only; if base is 0, keep 0 even if mult > 1
+    let afterMult = base > 0 ? Math.round(base * mult) : 0;
+    parts.push(`倍率:${mult}→${afterMult}`);
+
+    let bonus = 0;
+
+    if (state.bonusFirst && isFirstCatch) { bonus += 1; parts.push("先制+1"); }
+
+    if (state.bonusGirl) {
+      const pl = getPlayer(whoName);
+      if (pl.gender === "f") { bonus += 1; parts.push("女性+1"); }
+    }
+
+    if (state.bonusFunny && funnyBonus) { bonus += 1; parts.push("外道+1"); }
+
+    const total = afterMult + bonus;
+    return { total, breakdown: parts.join(" / ") };
+  }
+
+  // ---- UI refs ----
+  const whoEl = document.getElementById("who");
+  const cmEl = document.getElementById("cm");
+  const speciesEl = document.getElementById("species");
+  const memoEl = document.getElementById("memo");
+
+  const bonusFirstEl = document.getElementById("bonusFirst");
+  const bonusGirlEl = document.getElementById("bonusGirl");
+  const bonusFunnyEl = document.getElementById("bonusFunny");
+
+  const scoreGridEl = document.getElementById("scoreGrid");
+  const logEl = document.getElementById("log");
+
+  const playersEl = document.getElementById("players");
+  const rulesEl = document.getElementById("rules");
+  const speciesRulesEl = document.getElementById("speciesRules");
+
+  // Dialog
+  const dlg = document.getElementById("dlg");
+  const dlgTitle = document.getElementById("dlgTitle");
+  const dlgContent = document.getElementById("dlgContent");
+  const dlgActions = document.getElementById("dlgActions");
+
+  function openDialog(title, contentHtml, actions) {
+    dlgTitle.textContent = title;
+    dlgContent.innerHTML = contentHtml;
+    dlgActions.innerHTML = "";
+    for (const a of actions) dlgActions.appendChild(a);
+    dlg.showModal();
+  }
+  function btn(text, className, onClick) {
+    const b = document.createElement("button");
+    b.className = "btn " + (className || "");
+    b.textContent = text;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // ---- Renderers ----
+  function refreshSelects() {
+    // players
+    whoEl.innerHTML = "";
+    for (const p of state.players) {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      opt.textContent = p.name + (p.gender === "f" ? "（女性）" : "");
+      whoEl.appendChild(opt);
+    }
+    // species
+    speciesEl.innerHTML = "";
+    for (const s of state.species) {
+      const opt = document.createElement("option");
+      opt.value = s.name;
+      opt.textContent = `${s.name}（×${s.mult}）`;
+      speciesEl.appendChild(opt);
+    }
+  }
+
+  function renderScoreboard() {
+    // totals per player
+    const totals = {};
+    const counts = {};
+    let maxCm = null;
+    for (const p of state.players) { totals[p.name] = 0; counts[p.name] = 0; }
+    for (const e of state.log) {
+      totals[e.whoName] = (totals[e.whoName] || 0) + e.tickets;
+      counts[e.whoName] = (counts[e.whoName] || 0) + 1;
+      if (typeof e.cm === "number" && Number.isFinite(e.cm)) maxCm = (maxCm==null)? e.cm : Math.max(maxCm, e.cm);
+    }
+
+    scoreGridEl.innerHTML = "";
+    const playersSorted = state.players.slice().sort((a,b)=> (totals[b.name]||0) - (totals[a.name]||0));
+    for (const p of playersSorted) {
+      const div = document.createElement("div");
+      div.innerHTML = `
+        <div class="muted">${escapeHtml(p.name)} 合計枚数</div>
+        <div class="big">${totals[p.name] || 0}</div>
+        <div class="muted">匹数：${counts[p.name] || 0}</div>
+      `;
+      scoreGridEl.appendChild(div);
+    }
+
+    // global stats
+    const g1 = document.createElement("div");
+    g1.innerHTML = `<div class="muted">合計匹数</div><div class="big">${state.log.length}</div>`;
+    const g2 = document.createElement("div");
+    g2.innerHTML = `<div class="muted">最大サイズ</div><div class="big">${maxCm==null ? "-" : (maxCm.toFixed(1)+"cm")}</div>`;
+    scoreGridEl.appendChild(g1);
+    scoreGridEl.appendChild(g2);
+  }
+
+  function renderLog() {
+    logEl.innerHTML = "";
+    const reversed = state.log.slice().reverse();
+    reversed.forEach((e, idxFromTop) => {
+      const idx = state.log.length - 1 - idxFromTop; // original index
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(e.time)}</td>
+        <td>${escapeHtml(e.whoName)}</td>
+        <td>${e.cm == null ? "-" : escapeHtml(e.cm.toFixed(1)) + "cm"}</td>
+        <td>${escapeHtml(e.speciesName || "-")}</td>
+        <td>${escapeHtml(e.memo || "")}</td>
+        <td><b>${e.tickets}</b>枚</td>
+        <td class="muted">${escapeHtml(e.breakdown || "")}</td>
+        <td class="right"><button class="btn sub" data-edit="${idx}">✏️</button></td>
+      `;
+      logEl.appendChild(tr);
+    });
+
+    // bind edit buttons
+    logEl.querySelectorAll("button[data-edit]").forEach(b => {
+      b.addEventListener("click", () => openEditDialog(Number(b.getAttribute("data-edit"))));
+    });
+  }
+
+  function recomputeAll() {
+    refreshSelects();
+    renderScoreboard();
+    renderLog();
+  }
+
+  // ---- Actions ----
+  function addEntry({whoName, cm, speciesName, memo, funnyBonus=false, manualTickets=null}) {
+    const isFirstCatch = state.log.length === 0;
+    const { total, breakdown } = calcTickets({cm, whoName, speciesName, isFirstCatch, funnyBonus, manualTickets});
+
+    if (total <= 0) {
+      alert("ルール未満（0枚）っぽい！サイズ条件や倍率を見直すか、手動加算を使ってね。");
+      return;
+    }
+    state.log.push({
+      id: crypto?.randomUUID?.() || String(Date.now()) + "_" + Math.random().toString(16).slice(2),
+      time: nowText(),
+      whoName,
+      cm: (cm == null ? null : Math.round(cm * 10) / 10),
+      speciesName: speciesName || "指定なし",
+      memo: memo || "",
+      tickets: total,
+      breakdown
+    });
+    saveState();
+    recomputeAll();
+  }
+
+  function openEditDialog(index) {
+    const e = state.log[index];
+    if (!e) return;
+
+    const playerOptions = state.players.map(p => `<option value="${escapeHtml(p.name)}" ${p.name===e.whoName?"selected":""}>${escapeHtml(p.name)}</option>`).join("");
+    const speciesOptions = state.species.map(s => `<option value="${escapeHtml(s.name)}" ${s.name===e.speciesName?"selected":""}>${escapeHtml(s.name)}</option>`).join("");
+
+    openDialog(
+      "履歴を編集",
+      `
+      <div class="row">
+        <div class="field">
+          <label>誰</label>
+          <select id="edWho">${playerOptions}</select>
+        </div>
+        <div class="field">
+          <label>サイズ（cm）</label>
+          <input id="edCm" type="number" inputmode="decimal" step="0.1" value="${e.cm==null?"":e.cm}" />
+        </div>
+        <div class="field">
+          <label>魚種</label>
+          <select id="edSpecies">${speciesOptions}</select>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>メモ</label>
+        <input id="edMemo" type="text" value="${escapeHtml(e.memo || "")}" />
+      </div>
+      <p class="muted" style="margin:10px 0 0;">※編集後に枚数は再計算されます（先制判定は元の“最初の1件”にのみ適用）。</p>
+      `,
+      [
+        btn("キャンセル","sub", ()=>dlg.close()),
+        btn("削除","danger", ()=>{
+          state.log.splice(index, 1);
+          saveState(); recomputeAll();
+          dlg.close();
+        }),
+        btn("保存","", ()=>{
+          const whoName = document.getElementById("edWho").value;
+          const cmVal = document.getElementById("edCm").value.trim();
+          const cm = cmVal ? Number(cmVal) : null;
+          const speciesName = document.getElementById("edSpecies").value;
+          const memo = document.getElementById("edMemo").value;
+
+          // Recalc: "first catch" only for index 0
+          const isFirstCatch = index === 0;
+          const { total, breakdown } = calcTickets({cm, whoName, speciesName, isFirstCatch, funnyBonus:false, manualTickets:null});
+
+          if (total <= 0) { alert("この内容だと0枚になっちゃう！"); return; }
+
+          state.log[index] = {
+            ...state.log[index],
+            whoName,
+            cm: (cm == null ? null : Math.round(cm * 10) / 10),
+            speciesName,
+            memo,
+            tickets: total,
+            breakdown
+          };
+          saveState(); recomputeAll();
+          dlg.close();
+        }),
+      ]
+    );
+  }
+
+  function openManualAddDialog() {
+    const playerOptions = state.players.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+    openDialog(
+      "手動で枚数を加算",
+      `
+      <div class="row">
+        <div class="field">
+          <label>誰</label>
+          <select id="manWho">${playerOptions}</select>
+        </div>
+        <div class="field">
+          <label>加算する枚数</label>
+          <input id="manTickets" type="number" inputmode="numeric" step="1" min="1" value="1" />
+        </div>
+        <div class="field" style="flex:2 1 240px;">
+          <label>理由メモ（任意）</label>
+          <input id="manMemo" type="text" placeholder="例：チャンピオンタイム / 観客ボーナス など" />
+        </div>
+      </div>
+      `,
+      [
+        btn("キャンセル","sub", ()=>dlg.close()),
+        btn("加算","", ()=>{
+          const whoName = document.getElementById("manWho").value;
+          const t = Number(document.getElementById("manTickets").value);
+          if (!Number.isFinite(t) || t <= 0) { alert("枚数を入れてね"); return; }
+          const memo = document.getElementById("manMemo").value.trim();
+          addEntry({whoName, cm:null, speciesName:"指定なし", memo: (memo ? `手動:${memo}` : "手動加算"), manualTickets: Math.round(t)});
+          dlg.close();
+        }),
+      ]
+    );
+  }
+
+  function openRouletteEditDialog() {
+    const lines = (state.roulette || defaultRoulette).join("\n");
+    openDialog(
+      "ご飯ルーレット編集",
+      `
+      <label>1行=1候補</label>
+      <textarea id="rouLines">${escapeHtml(lines)}</textarea>
+      <p class="muted" style="margin:8px 0 0;">例：焼肉 / 寿司 / ラーメン…（早妃子さんの好きな店も入れると当たり率が上がる※諸説）</p>
+      `,
+      [
+        btn("キャンセル","sub", ()=>dlg.close()),
+        btn("保存","", ()=>{
+          const t = document.getElementById("rouLines").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+          state.roulette = t.length ? t : defaultRoulette;
+          saveState();
+          dlg.close();
+          alert("ルーレット保存OK！");
+        })
+      ]
+    );
+  }
+
+  function spinRoulette() {
+    const list = (state.roulette && state.roulette.length) ? state.roulette : defaultRoulette;
+    const pick = list[Math.floor(Math.random() * list.length)];
+    openDialog(
+      "本日のご飯、決定！",
+      `<p style="font-size:22px; font-weight:900; margin:6px 0 0;">${escapeHtml(pick)}</p>
+       <p class="muted" style="margin:10px 0 0;">※異議申立ては「もう1回」で受け付けます。</p>`,
+      [
+        btn("閉じる","sub", ()=>dlg.close()),
+        btn("もう1回","", ()=>{ dlg.close(); spinRoulette(); }),
+      ]
+    );
+  }
+
+  // ---- Bindings ----
+  document.getElementById("addBtn").addEventListener("click", () => {
+    const whoName = whoEl.value;
+    const cm = Number(cmEl.value);
+    if (!Number.isFinite(cm) || cm <= 0) { alert("サイズ（cm）を入力してね！"); cmEl.focus(); return; }
+    const speciesName = speciesEl.value;
+    const memo = memoEl.value.trim();
+    addEntry({whoName, cm, speciesName, memo});
+    cmEl.value = ""; memoEl.value = "";
+  });
+
+  cmEl.addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("addBtn").click(); });
+
+  document.getElementById("funnyBtn").addEventListener("click", () => {
+    if (!state.bonusFunny) {
+      alert("外道ボーナスがOFFだよ！設定でONにしてね。");
+      return;
+    }
+    const whoName = whoEl.value;
+    addEntry({whoName, cm: null, speciesName: "外道（フグ/エソ等）", memo: "笑えた外道", funnyBonus: true});
+  });
+
+  document.getElementById("manualBtn").addEventListener("click", openManualAddDialog);
+
+  document.getElementById("undoBtn").addEventListener("click", () => {
+    if (!state.log.length) return;
+    state.log.pop();
+    saveState();
+    recomputeAll();
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if (!confirm("全部消す？（戻せません）")) return;
+    state.log = [];
+    saveState();
+    recomputeAll();
+  });
+
+  document.getElementById("rouletteBtn").addEventListener("click", spinRoulette);
+  document.getElementById("editRouletteBtn").addEventListener("click", openRouletteEditDialog);
+
+  // toggles
+  bonusFirstEl.checked = !!state.bonusFirst;
+  bonusGirlEl.checked  = !!state.bonusGirl;
+  bonusFunnyEl.checked = !!state.bonusFunny;
+
+  bonusFirstEl.addEventListener("change", ()=>{ state.bonusFirst = bonusFirstEl.checked; saveState(); recomputeAll(); });
+  bonusGirlEl.addEventListener("change",  ()=>{ state.bonusGirl  = bonusGirlEl.checked;  saveState(); recomputeAll(); });
+  bonusFunnyEl.addEventListener("change", ()=>{ state.bonusFunny = bonusFunnyEl.checked; saveState(); recomputeAll(); });
+
+  // settings textareas init
+  playersEl.value = playersToText(state.players);
+  rulesEl.value = rulesToText(state.rules);
+  speciesRulesEl.value = speciesToText(state.species);
+
+  document.getElementById("savePlayersBtn").addEventListener("click", () => {
+    state.players = parsePlayers(playersEl.value);
+    saveState(); recomputeAll();
+    alert("プレイヤー保存OK！");
+  });
+  document.getElementById("resetPlayersBtn").addEventListener("click", () => {
+    state.players = defaultPlayers;
+    playersEl.value = playersToText(state.players);
+    saveState(); recomputeAll();
+  });
+
+  document.getElementById("saveRulesBtn").addEventListener("click", () => {
+    state.rules = parseRules(rulesEl.value);
+    rulesEl.value = rulesToText(state.rules);
+    saveState(); recomputeAll();
+    alert("サイズルール保存OK！");
+  });
+  document.getElementById("resetRulesBtn").addEventListener("click", () => {
+    state.rules = defaultRules;
+    rulesEl.value = rulesToText(state.rules);
+    saveState(); recomputeAll();
+  });
+
+  document.getElementById("saveSpeciesBtn").addEventListener("click", () => {
+    state.species = parseSpecies(speciesRulesEl.value);
+    // ensure "指定なし" exists
+    if (!state.species.find(s => s.name === "指定なし")) state.species.unshift({name:"指定なし", mult:1.0});
+    speciesRulesEl.value = speciesToText(state.species);
+    saveState(); recomputeAll();
+    alert("倍率保存OK！");
+  });
+  document.getElementById("resetSpeciesBtn").addEventListener("click", () => {
+    state.species = defaultSpecies;
+    speciesRulesEl.value = speciesToText(state.species);
+    saveState(); recomputeAll();
+  });
+
+  // init
+  recomputeAll();
+</script>
+</body>
+</html>
